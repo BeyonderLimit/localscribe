@@ -6,7 +6,7 @@ The key design principle is to maximize sustained transcription throughput, accu
 
 The application should work without an internet connection after its selected models have been downloaded. Audio processing and transcription remain on-device, and users can dictate meeting transcripts, long-form notes, or short snippets without a fixed session limit imposed by the application.
 
-## 1. Proposed architecture
+## 1. Architecture
 
 Terminal UI (TUI)
 
@@ -36,7 +36,7 @@ Local transcript store
 
 Incremental saving · timestamps · recovery after interruption · export to TXT, SRT, or JSON
 
-I'd use Python with Textual for the TUI, a dedicated audio-capture thread, a VAD such as Silero VAD or WebRTC VAD, and native speech engines behind a common adapter interface. The audio callback must never wait for inference or terminal rendering.
+Python with Textual for the TUI, a dedicated audio-capture thread, a VAD such as Silero VAD or WebRTC VAD, and native speech engines behind a common adapter interface. The audio callback must never wait for inference or terminal rendering.
 
 ## 2. Engine selection: Vosk vs. whisper.cpp
 
@@ -117,13 +117,13 @@ System RAM4 4 GB or less
 
 64 GB or more
 
-CPU classlow Low-power / older CPU
+CPU class: low Low-power / older CPU
 
 Modern desktop or laptop CPU
 
 High-core-count workstation
 
-Available accelerationnone CPU only / unknown GPU support
+Available acceleration none CPU only / unknown GPU support
 
 Apple Silicon / Metal
 
