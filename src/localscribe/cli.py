@@ -5,48 +5,23 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-from pathlib import Path
-
-import numpy as np
 
 from . import __version__ as _VERSION
 from . import config as config_mod
-from .audio.capture import AudioCapture
 from .events import EventType
 from .hardware import probe as hardware_probe
 from .models.catalog import default_catalog
 from .models.manager import ModelManager
-from .platform import model_dir
-from .storage.transcript import TranscriptRecord, TranscriptStore
+from .session import SessionController
 
 
-def _find_model_path(cfg) -> Path | None:
-    if cfg.model:
-        p = Path(cfg.model)
-        if p.exists():
-            return p
-    root = model_dir()
-    for p in root.rglob("*"):
-        if p.is_dir() and ((p / "am").exists() or (p / "graph").exists() or (p / "README").exists()):
-            return p
-    for p in root.iterdir():
-        if p.is_dir():
-            return p
-    # allow zip? Vosk needs dir
-    return None
-
-
-async def _run_engine_events(engine, store, stop_event):
-    async for ev in engine.events():
-        if stop_event.is_set():
-            break
-        if ev.type == EventType.PARTIAL:
-            print(f"\r… {ev.text}", end="", flush=True)
-        elif ev.type == EventType.FINAL:
-            print(f"\n✓ {ev.text}", flush=True)
-            store.append(TranscriptRecord(type=ev.type.value, text=ev.text, start_s=ev.start_s, end_s=ev.end_s, metadata=ev.metadata))
-        elif ev.type.value.endswith("warning"):
-            print(f"\n! {ev.text}", flush=True)
+def _print_event(ev) -> None:
+    if ev.type == EventType.PARTIAL:
+        print(f"\r… {ev.text}", end="", flush=True)
+    elif ev.type == EventType.FINAL:
+        print(f"\n✓ {ev.text}", flush=True)
+    elif ev.type.value.endswith("warning"):
+        print(f"\n! {ev.text}", flush=True)
 
 
 async def run_session(args) -> int:
@@ -54,86 +29,46 @@ async def run_session(args) -> int:
     if args.engine:
         cfg.engine = args.engine
 
-    capture = AudioCapture(sample_rate=cfg.sample_rate, channels=cfg.channels)
-    capture.start()
-    model_path = _find_model_path(cfg)
-    engine = None
-    if cfg.engine == "vosk":
-        from .engines.vosk_engine import VoskEngine
+    controller = SessionController(
+        cfg, on_event=_print_event, output=getattr(args, "output", None)
+    )
+    try:
+        await controller.start()
+    except Exception as e:
+        print(f"Could not start session: {e}")
+        return 1
 
-        if model_path is None:
-            print("No Vosk model found. Download/install one under", model_dir())
-            capture.stop()
-            return 1
-        engine = VoskEngine()
-        await engine.start(config_mod_engine_config(cfg, str(model_path)))
-    store = TranscriptStore(Path(args.output) if getattr(args, "output", None) else None)
-    stop_event = asyncio.Event()
-
-    async def capture_loop():
-        while not stop_event.is_set():
-            await asyncio.sleep(cfg.frame_ms / 1000.0)
-            samples = capture.read()
-            if samples.size == 0 or engine is None:
-                continue
-            from .engines.base import AudioChunk
-
-            await engine.feed(AudioChunk(pcm=samples.astype(np.int16).tobytes(), sample_rate=cfg.sample_rate, channels=cfg.channels))
-
-    from datetime import datetime
-
-    event_task = asyncio.create_task(_run_engine_events(engine, store, stop_event))
-    capture_task = asyncio.create_task(capture_loop())
     profile = hardware_probe.probe()
-    print(f"LocalScribe running: engine={cfg.engine} model={model_path} cores={profile.physical_cores} ram_gb={profile.ram_bytes/(1024**3):.1f}")
+    print(
+        f"LocalScribe running: engine={cfg.engine} model={controller.model_path} "
+        f"cores={profile.physical_cores} ram_gb={profile.ram_bytes/(1024**3):.1f}"
+    )
     print("Press Ctrl+C to stop.")
     try:
         await asyncio.Event().wait()
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
-        stop_event.set()
-        capture_task.cancel()
+        await controller.stop()
+        # Export readable TXT/JSON/SRT transcripts on exit.
         try:
-            await capture_task
-        except (asyncio.CancelledError, BaseException):
-            pass
-        if engine is not None:
-            try:
-                await engine.flush()
-            except Exception:
-                pass
-            await engine.stop()
-        capture.stop()
-        event_task.cancel()
-        try:
-            await event_task
-        except (asyncio.CancelledError, BaseException):
-            pass
-        # Export a readable text transcript on exit.
-        try:
-            from .storage.export import to_txt
-
-            out_name = datetime.now().strftime("scribed-%m-%d-%Y-%H-%M.txt")
-            out_path = Path.cwd() / out_name
-            to_txt(store.read_all(), out_path)
+            out_path = controller.export()
             print(f"\nSaved transcript to {out_path}")
         except Exception as e:
             print(f"\nCould not save transcript: {e}")
     return 0
 
 
-def config_mod_engine_config(cfg, model_path):
-    from .engines.base import EngineConfig
-
-    return EngineConfig(model_path=model_path, sample_rate=cfg.sample_rate, threads=cfg.whisper_threads, language="en")
-
-
 async def run_tui(args) -> int:
     from .tui.session import LocalScribeApp
 
-    app = LocalScribeApp()
+    cfg = config_mod.Config.load()
+    if args.engine:
+        cfg.engine = args.engine
+    app = LocalScribeApp(cfg, output=getattr(args, "output", None))
     await app.run_async()
+    if app.export_path:
+        print(f"Saved transcript to {app.export_path}")
     return 0
 
 

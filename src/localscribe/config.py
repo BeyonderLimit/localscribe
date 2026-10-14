@@ -23,6 +23,7 @@ class Config:
     whisper_threads: int = 4
     ui_refresh_ms: int = 100
     retention: str = "keep"  # keep | hours:N | delete
+    export_dir: str | None = None  # where TXT/JSON/SRT exports go; None = cwd
     verbose: bool = False
 
     def path(self) -> Path:

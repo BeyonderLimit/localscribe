@@ -25,22 +25,16 @@ class AudioCapture:
         self._stream: sd.InputStream | None = None
         self._level = AudioLevel()
         self._lock = threading.Lock()
+        self._data_ready = threading.Event()
 
     def _callback(self, indata, frames, time, status) -> None:  # pragma: no cover - device callback
-        # Hard rule: only append to ring buffer.
+        # Hard rule: only append to the preallocated ring buffer and signal the worker.
+        # No VAD, inference, disk I/O, or UI work may happen here.
         try:
             self.ring.write(indata)
         except Exception:
             pass
-        # Level meter kept minimal and lock-protected.
-        try:
-            arr = np.asarray(indata).reshape(-1)
-            if arr.size:
-                with self._lock:
-                    self._level.rms = float(np.sqrt(np.mean(arr.astype(np.float64) ** 2)))
-                    self._level.peak = float(np.max(np.abs(arr)))
-        except Exception:
-            pass
+        self._data_ready.set()
 
     def start(self, device=None) -> None:
         if self._stream is not None:
@@ -66,5 +60,15 @@ class AudioCapture:
         with self._lock:
             return AudioLevel(rms=self._level.rms, peak=self._level.peak)
 
+    def has_data(self) -> bool:
+        return self._data_ready.is_set()
+
     def read(self) -> np.ndarray:
-        return self.ring.read_available()
+        out = self.ring.read_available()
+        if out.size:
+            self._data_ready.clear()
+            arr = out.astype(np.float64)
+            with self._lock:
+                self._level.rms = float(np.sqrt(np.mean(arr**2)))
+                self._level.peak = float(np.max(np.abs(arr)))
+        return out

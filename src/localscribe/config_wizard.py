@@ -51,6 +51,7 @@ def run_wizard(cfg: Config | None = None) -> Config:
     cfg.ring_buffer_seconds = _ask_int("Ring buffer seconds", cfg.ring_buffer_seconds)
     cfg.ui_refresh_ms = _ask_int("UI refresh ms", cfg.ui_refresh_ms)
     cfg.retention = _ask("Audio retention (keep/hours:N/delete)", cfg.retention)
+    cfg.export_dir = _ask("Export directory (blank for cwd)", cfg.export_dir or "") or None
     cfg.verbose = _ask_bool("Verbose logging", cfg.verbose)
 
     cfg.save()

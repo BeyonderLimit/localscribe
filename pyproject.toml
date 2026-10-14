@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localscribe"
-version = "0.1.1"
+version = "0.1.2"
 description = "Offline, hardware-adaptive ASR dictation TUI"
 requires-python = ">=3.11"
 dependencies = [
@@ -12,6 +12,7 @@ dependencies = [
   "sounddevice>=0.4.6",
   "numpy>=1.26",
   "vosk>=0.3.45",
+  "requests>=2.31",
 ]
 
 [project.optional-dependencies]
