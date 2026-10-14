@@ -1,6 +1,6 @@
 # LocalScribe - Offline ASR Dictation Tool — Hardware-Adaptive TUI
 
-I'd build this as a local-first, hardware-aware dictation application that benchmarks the client's machine, recommends the best speech-recognition configuration, and continuously transcribes microphone input for as long as the user needs.
+This is a local-first, hardware-aware dictation application that benchmarks the client's machine, it recommends the best speech-recognition configuration, and continuously transcribes microphone input for as long as the user needs.
 
 The key design principle is to maximize sustained transcription throughput, accuracy, and responsiveness, rather than simply selecting the largest model the hardware can load.
 
@@ -318,15 +318,3 @@ localscribe/
     └── test_engine_adapters.py
 ```
 
-## 9. Recommended implementation order
-
-1. Build the microphone-to-transcript pipeline with Vosk, VAD, and continuous saving.
-2. Add whisper.cpp as a second engine behind the same adapter interface.
-3. Implement hardware discovery and short, repeatable benchmarks.
-4. Add the model catalog, model downloads, checksums, and manual overrides.
-5. Build the Textual setup wizard and live monitoring screen.
-6. Add queue-pressure adaptation, crash recovery, long-duration stress tests, and offline-mode tests.
-
-My recommendation: make the first usable release CPU-capable and fully offline, with Vosk as the low-resource streaming option and whisper.cpp as the quality-oriented option. Then add GPU acceleration when the installed backend supports it. Make measured sustained throughput the deciding factor, and never sacrifice audio integrity merely to keep the interface appearing responsive.
-
-The next practical step is to generate the runnable Python project with the engine adapters, TUI, hardware profiler, and model manager. The configuration prototype above can be used as its starting specification.
