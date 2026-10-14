@@ -229,14 +229,6 @@ Audio queue
 
 ### Transcript
 
-Today we are reviewing the project milestones, discussing the current implementation, and identifying the remaining work for the next release.
-
-We should prioritize reliable audio capture, make sure the transcript is saved continuously, and test performance on the lowest-spec client machines.
-
-We also need to validate the model selection...
-
-Illustrative mock data only — these are not actual microphone readings or transcription results.
-
 Pause
 
 Insert marker
@@ -283,7 +275,7 @@ Useful references for implementing these parts are the [Vosk model catalog](<htt
 
 +1
 
-## 8. Suggested project structure
+## 8. Project structure
 
 text
 ```
